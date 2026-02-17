@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    /**
+     * Reglas para la colección de usuarios.
+     * Protege la privacidad del perfil personal.
+     */
+    match /users/{userId} {
+      // Un usuario solo puede leer y escribir su propia información.
+      // Esto previene que otros usuarios vean datos como el email o config personal.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    /**
+     * Reglas para la colección de alertas ciudadanas.
+     * Implementa la restricción de propiedad y autenticación.
+     */
+    match /alerts/{alertId} {
+      // Lectura: Siguiendo el requerimiento estricto, el usuario solo puede ver sus propios reportes.
+      // Nota: Si en el futuro deseas un feed comunitario global, esta regla debería ser 'allow read: if true;'.
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Creación: Solo permitida para usuarios autenticados por Firebase (los invitados locales no tienen request.auth).
+      // Validamos que el ID del creador en los datos coincida con el ID de su sesión.
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      
+      // Actualización y Eliminación: Solo permitida para el dueño original de la alerta.
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    /**
+     * Bloqueo por defecto para cualquier otra colección no definida.
+     */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

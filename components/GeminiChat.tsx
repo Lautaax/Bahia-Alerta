@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { getBahiaBlancaPlaceInfo, PlaceResult } from '../services/geminiService';
+import React, { useState, useRef, useEffect } from 'react';
+import { getBahiaBlancaPlaceInfo } from '../services/geminiService';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,8 +24,11 @@ const GeminiChat: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -68,6 +71,26 @@ const GeminiChat: React.FC = () => {
     }
   };
 
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
+  const handleCopyHistory = () => {
+    const historyText = messages.map(m => {
+      const role = m.role === 'user' ? 'Tú' : 'Asistente';
+      return `${role}: ${m.content}`;
+    }).join('\n\n');
+
+    navigator.clipboard.writeText(historyText).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
   const handleSend = async (textOverride?: string) => {
     const messageToSend = textOverride || input;
     if (!messageToSend.trim() || isLoading) return;
@@ -76,6 +99,10 @@ const GeminiChat: React.FC = () => {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIsLoading(true);
+
+    // Create a new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     let lat: number | undefined;
     let lng: number | undefined;
@@ -90,15 +117,31 @@ const GeminiChat: React.FC = () => {
       console.warn("Could not get location for grounding.");
     }
 
-    const result = await getBahiaBlancaPlaceInfo(userMsg, lat, lng);
-    
-    setMessages(prev => [...prev, { 
-      role: 'assistant', 
-      content: result.text, 
-      sources: result.sources,
-      places: result.places
-    }]);
-    setIsLoading(false);
+    // Check if aborted before making the call (rare but possible)
+    if (abortController.signal.aborted) return;
+
+    try {
+      const result = await getBahiaBlancaPlaceInfo(userMsg, lat, lng);
+      
+      // Critical: Check if aborted AFTER the call returns but BEFORE state update
+      if (abortController.signal.aborted) return;
+
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: result.text, 
+        sources: result.sources,
+        places: result.places
+      }]);
+    } catch (error) {
+       if (!abortController.signal.aborted) {
+         setMessages(prev => [...prev, { role: 'assistant', content: "Lo siento, hubo un error al procesar tu solicitud." }]);
+       }
+    } finally {
+      if (!abortController.signal.aborted) {
+        setIsLoading(false);
+        abortControllerRef.current = null;
+      }
+    }
   };
 
   return (
@@ -119,6 +162,23 @@ const GeminiChat: React.FC = () => {
               </span>
             </div>
           </div>
+          
+          <button 
+            onClick={handleCopyHistory}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl border transition-all text-[10px] font-bold shadow-sm ${isCopied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-gray-500 border-gray-200 hover:text-blue-600 hover:border-blue-200'}`}
+          >
+            {isCopied ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <span>Copiado</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                <span>Copiar</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -171,10 +231,13 @@ const GeminiChat: React.FC = () => {
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 px-4 py-3 rounded-2xl flex items-center space-x-1">
-              <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-100"></div>
-              <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-200"></div>
+            <div className="bg-gray-100 px-4 py-3 rounded-2xl flex items-center space-x-3">
+              <div className="flex items-center space-x-1">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-200"></div>
+              </div>
+              <span className="text-xs text-gray-400 font-medium">Pensando...</span>
             </div>
           </div>
         )}
@@ -203,11 +266,13 @@ const GeminiChat: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={isListening ? "Escuchando..." : "Pregunta sobre la ciudad..."}
-              className={`w-full pl-4 pr-12 py-3.5 bg-white border rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-sm ${isListening ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200'}`}
+              disabled={isLoading}
+              className={`w-full pl-4 pr-12 py-3.5 bg-white border rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-sm ${isListening ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200'} ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
             <button 
               onClick={toggleListening}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all ${isListening ? 'text-red-600 bg-red-50 animate-pulse' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+              disabled={isLoading}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all ${isListening ? 'text-red-600 bg-red-50 animate-pulse' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'} ${isLoading ? 'opacity-0 pointer-events-none' : ''}`}
               title="Entrada de voz"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -216,15 +281,27 @@ const GeminiChat: React.FC = () => {
             </button>
           </div>
           
-          <button 
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isLoading}
-            className="p-3.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:bg-gray-300 shadow-md active:scale-95"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-          </button>
+          {isLoading ? (
+            <button 
+              onClick={handleStopGeneration}
+              className="p-3.5 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors shadow-md active:scale-95 group"
+              title="Detener generación"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          ) : (
+            <button 
+              onClick={() => handleSend()}
+              disabled={!input.trim()}
+              className="p-3.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:bg-gray-300 shadow-md active:scale-95"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+              </svg>
+            </button>
+          )}
         </div>
         <p className="text-[9px] text-gray-400 text-center mt-2 font-medium">
           La IA puede cometer errores. Verifica información crítica.
