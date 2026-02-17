@@ -22,10 +22,13 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
   };
 
   const handleShare = async () => {
+    // Generate a specific Google Maps link for the alert location
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${alert.location.lat},${alert.location.lng}`;
+    
     const shareData = {
       title: `🚨 Bahía Alerta: ${alert.category}`,
-      text: `${alert.description} en ${alert.location.address}. Reportado en Bahía Alerta.`,
-      url: window.location.href,
+      text: `${alert.description} en ${alert.location.address}.`,
+      url: mapUrl,
     };
 
     if (navigator.share) {
@@ -38,7 +41,8 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
       }
     } else {
       try {
-        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        // Fallback: Copy detailed text to clipboard
+        await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}\n📍 Ver en mapa: ${shareData.url}`);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
@@ -65,12 +69,23 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
             <button 
               onClick={handleShare}
               title="Compartir alerta"
-              className="flex items-center space-x-2 text-blue-600 hover:text-white hover:bg-blue-600 px-4 py-2.5 bg-white rounded-2xl shadow-sm border border-gray-100 transition-all active:scale-95"
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-2xl shadow-sm border transition-all active:scale-95 ${copied ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-blue-600 hover:text-white hover:bg-blue-600 border-gray-100'}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <span className="text-xs font-bold uppercase">Difundir</span>
+              {copied ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-xs font-bold uppercase">Copiado</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  <span className="text-xs font-bold uppercase">Difundir</span>
+                </>
+              )}
             </button>
             
             <button 
