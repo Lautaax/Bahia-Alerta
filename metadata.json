@@ -1,0 +1,8 @@
+{
+  "name": "Bahía Alerta para my sql",
+  "description": "Sistema de alertas en tiempo real para Bahía Blanca con sistema de reputación y chat asistido por IA.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ]
+}
