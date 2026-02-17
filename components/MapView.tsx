@@ -67,6 +67,31 @@ const MapView: React.FC<MapViewProps> = ({ alerts, onSelectAlert, userSettings }
     }
   };
 
+  const getCategoryIconSvg = (category: AlertCategory) => {
+    switch (category) {
+      case AlertCategory.ACCIDENT:
+        // Car/Collision icon
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-5h14v5z"/></svg>`;
+      case AlertCategory.CRIME:
+        // Shield/Warning icon
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 10c-2.7 0-5.8-1.29-6-2.01.02-1.99 3.97-3.08 6-3.08 2.04 0 5.99 1.09 6 3.08-.2.72-3.3 2.01-6 2.01z"/></svg>`;
+      case AlertCategory.TRAFFIC:
+        // Traffic light/Cars
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-1v2h1v2h-1v2h1v2h-1v2h1v2h-1v2h1v2h-1v2h-2V6h-2v14h-2V6h-2v14H9V6H7v14H5V6H4V4h16v2z"/></svg>`;
+      case AlertCategory.FIRE:
+        // Flame
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>`;
+      case AlertCategory.SERVICE:
+        // Lightning bolt (Power cut)
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`;
+      case AlertCategory.BROKEN_ASPHALT:
+        // Construction Cone/Warning
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.45l8.47 14.55H3.53L12 5.45zM11 10v6h2v-6h-2zm0 8v2h2v-2h-2z"/></svg>`;
+      default:
+        return `<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+    }
+  };
+
   const stopAudio = () => {
     if (currentSourceRef.current) {
       try {
@@ -197,14 +222,15 @@ const MapView: React.FC<MapViewProps> = ({ alerts, onSelectAlert, userSettings }
 
     filtered.forEach(alert => {
       const color = getCategoryColor(alert.category);
+      const iconSvg = getCategoryIconSvg(alert.category);
       
       const icon = L.divIcon({
         className: 'custom-marker',
         html: `
           <div class="relative flex items-center justify-center">
             <div class="absolute w-8 h-8 rounded-full opacity-30 alert-pulse" style="background-color: ${color}"></div>
-            <div class="relative w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[9px] font-black" style="background-color: ${color}">
-              ${alert.category[0]}
+            <div class="relative w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white" style="background-color: ${color}">
+              ${iconSvg}
             </div>
           </div>
         `,
