@@ -14,7 +14,7 @@ declare const L: any;
 const QUICK_REPORTS = [
   { label: '🚗 Choque', category: AlertCategory.ACCIDENT, text: 'Choque leve entre dos vehículos. No parece haber heridos de gravedad.' },
   { label: '🚥 Semáforo', category: AlertCategory.TRAFFIC, text: 'Semáforo fuera de servicio o con fallas en la sincronización.' },
-  { label: '🕳️ Pozo/Asfalto', category: AlertCategory.BROKEN_ASPHALT, text: 'Pozo de gran tamaño en la calle que dificulta el tránsito y puede dañar neumáticos.' },
+  { label: '🕳️ Pozo/Asfalto', category: AlertCategory.BROKEN_ASPHALT, text: 'Se reporta un pozo o desperfecto en el asfalto' },
   { label: '💡 Sin Luz', category: AlertCategory.SERVICE, text: 'Corte de luz total en la manzana.' },
   { label: '🚨 Robo', category: AlertCategory.CRIME, text: 'Actividad sospechosa o robo detectado en la vía pública.' },
 ];
@@ -243,6 +243,11 @@ const CreateAlertModal: React.FC<CreateAlertModalProps> = ({ onClose, onSubmit, 
     setCategory(cat);
     setHasManuallySelected(true);
     setIsAutoSelected(false);
+    
+    // Si se selecciona Asfalto Roto y la descripción está vacía, pre-completamos para guiar al usuario
+    if (cat === AlertCategory.BROKEN_ASPHALT && (!description.trim() || description === '')) {
+      setDescription('Se reporta un pozo o desperfecto en el asfalto');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

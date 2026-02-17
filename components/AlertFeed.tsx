@@ -11,6 +11,8 @@ interface AlertFeedProps {
 }
 
 const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, onVote, currentUser, onEdit, onSelect }) => {
+  const isGuest = currentUser?.id === 'guest';
+
   const getCategoryColor = (category: AlertCategory) => {
     switch (category) {
       case AlertCategory.ACCIDENT: return 'bg-red-100 text-red-800 border-red-200';
@@ -31,7 +33,7 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, onVote, currentUser, onEd
   };
 
   const canEdit = (alert: Alert) => {
-    if (!currentUser || alert.userId !== currentUser.id) return false;
+    if (!currentUser || isGuest || alert.userId !== currentUser.id) return false;
     const tenMinutesInMs = 10 * 60 * 1000;
     return (Date.now() - alert.timestamp) < tenMinutesInMs;
   };
@@ -101,7 +103,7 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, onVote, currentUser, onEd
           <div className="flex items-center justify-between pt-3 border-t border-gray-50">
             <div className="flex items-center space-x-2">
               <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                 <img src={`https://picsum.photos/seed/${alert.userId}/100`} alt="avatar" />
+                 <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${alert.userId}`} alt="avatar" />
               </div>
               <span className="text-xs font-semibold text-gray-700">{alert.userName}</span>
               <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">★ {alert.userReputation}</span>
@@ -109,8 +111,8 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, onVote, currentUser, onEd
 
             <div className="flex items-center space-x-4">
               <button 
-                onClick={(e) => { e.stopPropagation(); onVote(alert.id, 'up'); }}
-                className="flex items-center space-x-1 text-gray-500 hover:text-green-600 transition-colors"
+                onClick={(e) => { e.stopPropagation(); if(!isGuest) onVote(alert.id, 'up'); }}
+                className={`flex items-center space-x-1 transition-colors ${isGuest ? 'text-gray-300 cursor-default' : 'text-gray-500 hover:text-green-600'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -118,8 +120,8 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ alerts, onVote, currentUser, onEd
                 <span className="text-sm font-bold">{alert.upvotes}</span>
               </button>
               <button 
-                onClick={(e) => { e.stopPropagation(); onVote(alert.id, 'down'); }}
-                className="flex items-center space-x-1 text-gray-500 hover:text-red-600 transition-colors"
+                onClick={(e) => { e.stopPropagation(); if(!isGuest) onVote(alert.id, 'down'); }}
+                className={`flex items-center space-x-1 transition-colors ${isGuest ? 'text-gray-300 cursor-default' : 'text-gray-500 hover:text-red-600'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

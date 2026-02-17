@@ -18,9 +18,7 @@ import {
   query, 
   orderBy, 
   doc, 
-  updateDoc, 
-  setDoc,
-  Timestamp 
+  updateDoc 
 } from 'firebase/firestore';
 import { db } from './services/firebase';
 
@@ -44,7 +42,8 @@ const AppContent: React.FC = () => {
   const [showResolved, setShowResolved] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
 
-  // Escuchar alertas de Firestore en tiempo real
+  const isGuest = user?.id === 'guest';
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -67,7 +66,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleAddOrUpdateAlert = async (data: { category: AlertCategory, description: string, image?: string, location: { lat: number, lng: number, address: string } }) => {
-    if (!user) return;
+    if (!user || isGuest) return;
 
     if (editingAlert) {
       const alertRef = doc(db, "alerts", editingAlert.id);
@@ -94,6 +93,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleVote = async (id: string, type: 'up' | 'down') => {
+    if (isGuest) return;
     const alertRef = doc(db, "alerts", id);
     const alert = alerts.find(a => a.id === id);
     if (!alert) return;
@@ -106,6 +106,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleResolveAlert = async (id: string) => {
+    if (isGuest) return;
     const alertRef = doc(db, "alerts", id);
     await updateDoc(alertRef, { status: 'resolved' });
     setSelectedAlert(null);
@@ -129,7 +130,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-blue-600">
         <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-blue-600 font-black text-3xl animate-bounce">B</div>
-        <p className="mt-4 text-white font-bold tracking-widest text-xs uppercase animate-pulse">Conectando a Firebase...</p>
+        <p className="mt-4 text-white font-bold tracking-widest text-xs uppercase animate-pulse">Iniciando Bahía Alerta...</p>
       </div>
     );
   }
@@ -177,20 +178,23 @@ const AppContent: React.FC = () => {
               <MapView alerts={filteredAlerts} onSelectAlert={setSelectedAlert} userSettings={notificationSettings} />
             )}
             
-            <button 
-              onClick={() => { setEditingAlert(null); setIsModalOpen(true); }}
-              className="fixed bottom-24 right-6 bg-red-600 text-white p-4 rounded-full shadow-xl hover:bg-red-700 hover:scale-105 active:scale-95 transition-all flex items-center space-x-2 z-40"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              <span className="font-semibold pr-1">Reportar</span>
-            </button>
+            {/* Solo mostrar el botón de reportar si NO es invitado */}
+            {!isGuest && (
+              <button 
+                onClick={() => { setEditingAlert(null); setIsModalOpen(true); }}
+                className="fixed bottom-24 right-6 bg-red-600 text-white p-4 rounded-full shadow-xl hover:bg-red-700 hover:scale-105 active:scale-95 transition-all flex items-center space-x-2 z-40"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                <span className="font-semibold pr-1">Reportar</span>
+              </button>
+            )}
           </>
         ) : (
           <GeminiChat />
         )}
       </div>
 
-      {(isModalOpen || editingAlert) && (
+      {(isModalOpen || editingAlert) && !isGuest && (
         <CreateAlertModal onClose={() => { setIsModalOpen(false); setEditingAlert(null); }} onSubmit={handleAddOrUpdateAlert} initialAlert={editingAlert} />
       )}
 
@@ -203,6 +207,7 @@ const AppContent: React.FC = () => {
           onClose={() => setSelectedAlert(null)}
           onResolve={handleResolveAlert}
           onAddComment={async (id, text) => {
+            if (isGuest) return;
             const alertRef = doc(db, "alerts", id);
             const alert = alerts.find(a => a.id === id);
             if (!alert) return;

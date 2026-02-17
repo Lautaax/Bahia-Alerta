@@ -13,9 +13,10 @@ interface AlertDetailsModalProps {
 const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUser, onClose, onResolve, onAddComment }) => {
   const [commentInput, setCommentInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const isGuest = currentUser.id === 'guest';
 
   const handleSendComment = () => {
-    if (!commentInput.trim()) return;
+    if (!commentInput.trim() || isGuest) return;
     onAddComment(alert.id, commentInput.trim());
     setCommentInput('');
   };
@@ -72,12 +73,6 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
               <span className="text-xs font-bold uppercase">Difundir</span>
             </button>
             
-            {copied && (
-              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-3 py-1 rounded-full animate-in fade-in slide-in-from-top-1 whitespace-nowrap shadow-lg">
-                Copiado al portapapeles
-              </div>
-            )}
-
             <button 
               onClick={onClose} 
               className="text-gray-400 hover:text-gray-600 p-2.5 bg-white rounded-2xl shadow-sm border border-gray-100 transition-all active:scale-95"
@@ -114,19 +109,21 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     <span className="text-sm font-bold">REPARACIÓN PENDIENTE</span>
                  </div>
-                 <p className="text-xs text-amber-700 leading-tight">Este pozo persistirá en el mapa hasta que sea confirmado como reparado por los vecinos.</p>
-                 <button 
-                   onClick={() => onResolve?.(alert.id)}
-                   className="w-full bg-amber-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-amber-700 transition-colors shadow-sm"
-                 >
-                   Confirmar Reparación
-                 </button>
+                 <p className="text-xs text-amber-700 leading-tight">Este pozo persistirá en el mapa hasta que sea confirmado como reparado por los vecinos registrados.</p>
+                 {!isGuest && (
+                   <button 
+                     onClick={() => onResolve?.(alert.id)}
+                     className="w-full bg-amber-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-amber-700 transition-colors shadow-sm"
+                   >
+                     Confirmar Reparación
+                   </button>
+                 )}
               </div>
             )}
 
             <div className="flex items-center justify-between py-4 border-y border-gray-100">
                <div className="flex items-center space-x-3">
-                 <img src={`https://picsum.photos/seed/${alert.userId}/100`} className="w-10 h-10 rounded-xl border border-gray-200" alt="avatar" />
+                 <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${alert.userId}`} className="w-10 h-10 rounded-xl border border-gray-200" alt="avatar" />
                  <div>
                    <p className="text-sm font-bold text-gray-900">{alert.userName}</p>
                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Reportado a las {formatTime(alert.timestamp)}</p>
@@ -145,7 +142,7 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
               <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px]">{alert.comments?.length || 0}</span>
             </h3>
             
-            <div className="space-y-3">
+            <div className="space-y-3 pb-4">
               {alert.comments && alert.comments.length > 0 ? (
                 alert.comments.map(c => (
                   <div key={c.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
@@ -157,35 +154,42 @@ const AlertDetailsModal: React.FC<AlertDetailsModalProps> = ({ alert, currentUse
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-xs text-gray-400 font-medium italic">Sin comentarios aún. Sé el primero en aportar información.</p>
+                <div className="text-center py-4">
+                  <p className="text-xs text-gray-400 font-medium italic">Sin comentarios aún.</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="flex space-x-2 items-center bg-gray-50 p-1.5 rounded-2xl border border-gray-200 focus-within:border-blue-400 transition-colors">
-            <input 
-              type="text" 
-              value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
-              placeholder="Escribe un aporte o actualización..."
-              className="flex-1 bg-transparent border-none outline-none text-sm px-3 py-2.5"
-            />
-            <button 
-              onClick={handleSendComment}
-              disabled={!commentInput.trim()}
-              className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 transition-all active:scale-95 shadow-sm"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+        {/* Campo de comentarios: Oculto para invitados */}
+        {!isGuest ? (
+          <div className="p-4 border-t border-gray-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="flex space-x-2 items-center bg-gray-50 p-1.5 rounded-2xl border border-gray-200 focus-within:border-blue-400 transition-colors">
+              <input 
+                type="text" 
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                placeholder="Escribe un aporte o actualización..."
+                className="flex-1 bg-transparent border-none outline-none text-sm px-3 py-2.5"
+              />
+              <button 
+                onClick={handleSendComment}
+                disabled={!commentInput.trim()}
+                className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 transition-all active:scale-95 shadow-sm"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Inicia sesión para comentar y votar</p>
+          </div>
+        )}
       </div>
     </div>
   );

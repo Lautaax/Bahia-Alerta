@@ -6,10 +6,11 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
-  signInWithPopup 
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../services/firebase';
+import { encryptData, decryptData } from '../services/securityService';
 
 interface AuthContextType {
   user: AppUser | null;
@@ -18,6 +19,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginAsGuest: () => void;
   logout: () => void;
   updateReputation: (increment: number) => Promise<void>;
 }
@@ -28,38 +30,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Escuchar cambios de estado de Firebase
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Buscar perfil extendido en Firestore
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as AppUser);
-        } else {
-          // Si por alguna razón no existe el doc pero sí el auth, lo creamos
-          const newUser: AppUser = {
-            id: firebaseUser.uid,
-            name: firebaseUser.displayName || "Usuario de Bahía",
-            email: firebaseUser.email || "",
-            avatar: firebaseUser.photoURL || `https://picsum.photos/seed/${firebaseUser.uid}/200`,
-            reputation: 100,
-            isAnonymous: false
-          };
-          await setDoc(doc(db, "users", firebaseUser.uid), newUser);
-          setUser(newUser);
+    const initAuth = async () => {
+      // 1. Verificar si hay un invitado guardado localmente (cifrado)
+      const encryptedGuest = localStorage.getItem('bahia_alerta_session');
+      if (encryptedGuest) {
+        const decryptedUser = await decryptData(encryptedGuest);
+        if (decryptedUser && decryptedUser.id === 'guest') {
+          setUser(decryptedUser as AppUser);
+          setIsLoading(false);
+          return;
         }
-      } else {
-        setUser(null);
       }
-      setIsLoading(false);
-    });
 
-    return () => unsubscribe();
+      // 2. Si no es invitado, escuchar cambios de Firebase
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser(userDoc.data() as AppUser);
+          } else {
+            const newUser: AppUser = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || "Usuario de Bahía",
+              email: firebaseUser.email || "",
+              avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${firebaseUser.uid}`,
+              reputation: 100,
+              isAnonymous: false
+            };
+            await setDoc(doc(db, "users", firebaseUser.uid), newUser);
+            setUser(newUser);
+          }
+        } else {
+          setUser(null);
+        }
+        setIsLoading(false);
+      });
+
+      return unsubscribe;
+    };
+
+    const unsubscribePromise = initAuth();
+    return () => {
+      unsubscribePromise.then(unsub => unsub && typeof unsub === 'function' && unsub());
+    };
   }, []);
+
+  const loginAsGuest = async () => {
+    const guestUser: AppUser = {
+      id: 'guest',
+      name: 'Invitado',
+      email: '',
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=guest`,
+      reputation: 0,
+      isAnonymous: true
+    };
+    
+    const encryptedData = await encryptData(guestUser);
+    localStorage.setItem('bahia_alerta_session', encryptedData);
+    setUser(guestUser);
+  };
 
   const login = async (email: string, pass: string) => {
     try {
+      localStorage.removeItem('bahia_alerta_session');
       await signInWithEmailAndPassword(auth, email, pass);
       return { success: true };
     } catch (error: any) {
@@ -69,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (name: string, email: string, pass: string) => {
     try {
+      localStorage.removeItem('bahia_alerta_session');
       const res = await createUserWithEmailAndPassword(auth, email, pass);
       const newUser: AppUser = {
         id: res.user.uid,
@@ -78,7 +113,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reputation: 100,
         isAnonymous: false
       };
-      // Guardar perfil en Firestore
       await setDoc(doc(db, "users", res.user.uid), newUser);
       return { success: true };
     } catch (error: any) {
@@ -88,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     try {
+      localStorage.removeItem('bahia_alerta_session');
       const res = await signInWithPopup(auth, googleProvider);
       const userDoc = await getDoc(doc(db, "users", res.user.uid));
       
@@ -108,10 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => signOut(auth);
+  const logout = () => {
+    localStorage.removeItem('bahia_alerta_session');
+    signOut(auth);
+    setUser(null);
+  };
 
   const updateReputation = async (increment: number) => {
-    if (!user) return;
+    if (!user || user.id === 'guest') return;
     const userRef = doc(db, "users", user.id);
     const newRep = user.reputation + increment;
     await updateDoc(userRef, { reputation: newRep });
@@ -126,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       register, 
       loginWithGoogle,
+      loginAsGuest,
       logout,
       updateReputation
     }}>

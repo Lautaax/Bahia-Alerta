@@ -1,7 +1,7 @@
 
 /**
  * Servicio de Seguridad para Bahía Alerta
- * Utiliza Web Crypto API para operaciones criptográficas de alto rendimiento.
+ * Utiliza Web Crypto API para operaciones criptográficas de alto rendimiento y seguridad.
  */
 
 // Genera un hash SHA-256 de una cadena (útil para contraseñas)
@@ -23,10 +23,11 @@ const getEncryptionKey = async (secret: string) => {
     false,
     ['deriveKey']
   );
+  
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode('bahia-alerta-salt-2025'),
+      salt: encoder.encode('bahia-alerta-secure-salt-2025'),
       iterations: 100000,
       hash: 'SHA-256'
     },
@@ -37,13 +38,17 @@ const getEncryptionKey = async (secret: string) => {
   );
 };
 
-// Cifra un objeto o cadena con una clave secreta
-export const encryptData = async (data: any, secret: string = 'local-device-key'): Promise<string> => {
+/**
+ * Cifra un objeto o cadena con una clave secreta.
+ * Utiliza AES-GCM con un IV aleatorio.
+ */
+export const encryptData = async (data: any, secret: string = 'bahia-alerta-local-key'): Promise<string> => {
   try {
     const encoder = new TextEncoder();
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await getEncryptionKey(secret);
-    const encodedData = encoder.encode(typeof data === 'string' ? data : JSON.stringify(data));
+    const dataToEncrypt = typeof data === 'string' ? data : JSON.stringify(data);
+    const encodedData = encoder.encode(dataToEncrypt);
     
     const encryptedContent = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
@@ -51,21 +56,33 @@ export const encryptData = async (data: any, secret: string = 'local-device-key'
       encodedData
     );
 
+    // Combinar IV + Contenido cifrado
     const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
     combined.set(iv);
     combined.set(new Uint8Array(encryptedContent), iv.length);
     
-    return btoa(String.fromCharCode(...combined));
+    // Convertir a base64 de forma segura
+    return btoa(Array.from(combined, b => String.fromCharCode(b)).join(''));
   } catch (e) {
     console.error("Encryption error:", e);
     return "";
   }
 };
 
-// Descifra una cadena previamente cifrada
-export const decryptData = async (encryptedBase64: string, secret: string = 'local-device-key'): Promise<any> => {
+/**
+ * Descifra una cadena previamente cifrada.
+ */
+export const decryptData = async (encryptedBase64: string, secret: string = 'bahia-alerta-local-key'): Promise<any> => {
+  if (!encryptedBase64) return null;
+  
   try {
-    const combined = new Uint8Array(atob(encryptedBase64).split('').map(c => c.charCodeAt(0)));
+    // Revertir base64 a Uint8Array
+    const binaryString = atob(encryptedBase64);
+    const combined = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      combined[i] = binaryString.charCodeAt(i);
+    }
+
     const iv = combined.slice(0, 12);
     const content = combined.slice(12);
     const key = await getEncryptionKey(secret);
